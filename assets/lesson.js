@@ -91,15 +91,27 @@ window.__t = {r2k, canon, lenient};
 
 /* ---------- speech ---------- */
 let jaVoice=null;
-function pickVoice(){ try{ jaVoice = (speechSynthesis.getVoices()||[]).find(v=>/^ja/i.test(v.lang)) || null; }catch(e){} }
+function pickVoice(){
+  try{
+    const vs=(speechSynthesis.getVoices()||[]).filter(v=>/^ja([-_]|$)/i.test(v.lang));
+    jaVoice = vs.find(v=>v.localService) || vs[0] || null;
+  }catch(e){}
+}
 try{ pickVoice(); speechSynthesis.addEventListener('voiceschanged', pickVoice); }catch(e){}
+let _u=null, _t=null;
 function speak(t){
   if(!t) return;
   try{
-    speechSynthesis.cancel();
-    const u=new SpeechSynthesisUtterance(t); u.lang='ja-JP'; if(jaVoice) u.voice=jaVoice; u.rate = prefs.slow?0.6:0.9;
-    speechSynthesis.speak(u);
-    const nv=$('#novoice'); if(nv && !jaVoice && !(speechSynthesis.getVoices()||[]).length) nv.hidden=false;
+    const synth=window.speechSynthesis;
+    clearTimeout(_t);
+    synth.cancel(); synth.resume(); pickVoice();
+    // cancel() immediately followed by speak() is dropped by some browsers: wait a tick
+    _t=setTimeout(()=>{
+      const u=new SpeechSynthesisUtterance(t); _u=u;   // keep a reference so it is not garbage-collected mid-speech
+      u.lang='ja-JP'; if(jaVoice){ u.voice=jaVoice; u.lang=jaVoice.lang; } u.rate = prefs.slow?0.6:0.9;
+      synth.speak(u);
+    },90);
+    const nv=$('#novoice'); if(nv && !jaVoice && !(synth.getVoices()||[]).length) nv.hidden=false;
   }catch(e){}
 }
 document.addEventListener('click',e=>{
